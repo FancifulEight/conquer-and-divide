@@ -1566,6 +1566,7 @@ MonoBehaviour:
   - {x: 3, y: 0}
   armySplit: 1
   army: []
+  allEntities: []
   firstEncounter: {fileID: 27689560}
   lmbArr: 
   rmbArr: 
