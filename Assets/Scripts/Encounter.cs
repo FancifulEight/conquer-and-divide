@@ -26,6 +26,11 @@ public class Encounter : MonoBehaviour {
         return (actionToPerform == ActionType.LMB && isLeft) || (actionToPerform == ActionType.RMB && !isLeft);
     }
 
+    public bool InputGetMouse() {
+        int mouse = (actionToPerform == ActionType.LMB) ? 0:1;
+        return Input.GetMouseButtonDown(mouse) || Input.GetMouseButton(mouse);
+    }
+
     public void Recruit() {
         foreach (var item in actors)
         {

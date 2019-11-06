@@ -10,19 +10,20 @@ public class GameManager : MonoBehaviour {
     public AudioSource mainSrc;
     public AudioClip beat, song;
 
+    public float songLengthInSeconds = 48;
     public float beatTempo = 120;
     [Range(1, 8)]
     public int ticksPerBeat = 2;
     public int totalBeats;
 
     private double startDSP, tickLength, nextTickTime;
-    private int tickNum = 0;
+    private int tickCount = 0;
     public UnityEvent ticked = new UnityEvent();
 
     [Header("UI")]
     public Text readyText;
     public GameObject[] armyPaths = new GameObject[4];
-    public Animator kingAnim;
+    public King king;
 
     [Header("Gameplay")]
     public Color armyColour = Color.blue;
@@ -34,9 +35,12 @@ public class GameManager : MonoBehaviour {
     public List<Transform> allEntities = new List<Transform>();
 
     public Encounter firstEncounter;
+    public Encounter[] encountersPerBeat = new Encounter[0];
 
-    public bool[] lmbArr;
-    public bool[] rmbArr;
+    void OnValidate() {
+        totalBeats = (int)(beatTempo * songLengthInSeconds / 60);
+        System.Array.Resize(ref encountersPerBeat, totalBeats);
+    }
 
     void Awake() {
         if (gm == null) {
@@ -49,7 +53,6 @@ public class GameManager : MonoBehaviour {
     // Start is called before the first frame update
     void Start() {
         beatTempo /= 60;
-        totalBeats = (int)(beatTempo * 48);
 
         tickLength = 1f / (beatTempo * ticksPerBeat);
         nextTickTime = AudioSettings.dspTime + tickLength;
@@ -57,21 +60,37 @@ public class GameManager : MonoBehaviour {
         //ticked.AddListener(Tick);
         ticked.AddListener(BounceKing);
         
-        lmbArr = new bool[totalBeats];
-        rmbArr = new bool[totalBeats];
-
-        lmbArr[7-1] = true;
-        lmbArr[15-1] = true;
-        rmbArr[11-1] = true;
-        rmbArr[15-1] = true;
-
         mainSrc = GetComponent<AudioSource>();
         mainSrc.clip = beat;
         mainSrc.Play(); 
     }
 
     public void Tick() {
-        Debug.Log("Tick");
+        //Check if on beat, correct button is pressed
+        if (encountersPerBeat.Length <= tickCount) {
+            Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", tickCount));
+            return;
+        }
+        if (encountersPerBeat[tickCount] != null) {
+            //Check for hit
+            if (encountersPerBeat[tickCount].InputGetMouse()) {
+                //We Got A Hit!
+                ButtonHit();
+            } else {
+                //We got a Miss...
+                ButtonMissed();
+            }
+        }
+
+        //Check to spawn encounters early
+        int indexToCheck = tickCount + 2;
+        if (encountersPerBeat.Length <= indexToCheck) {
+            Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", indexToCheck));
+            return;
+        }
+        if (encountersPerBeat[indexToCheck] != null) {
+            //Spawn it 
+        }
     }
 
     private int kingBobCount = 0;
@@ -80,9 +99,9 @@ public class GameManager : MonoBehaviour {
         //Debug.Log("Count: " + kingBobCount);
 
         if (kingBobCount < beatsPerBob / 2)
-            kingAnim.SetBool("Bob", true);
+            king.kingAnim.SetBool("Bob", true);
         else
-            kingAnim.SetBool("Bob", false);
+            king.kingAnim.SetBool("Bob", false);
         
         kingBobCount = (kingBobCount + 1) % beatsPerBob;
     }
@@ -118,6 +137,9 @@ public class GameManager : MonoBehaviour {
     private bool startingUp = false, musicPlaying = false;
     // Update is called once per frame
     void Update() {
+        //King Semaphore
+        king.ChangeFlags(Input.GetMouseButton(0), Input.GetMouseButton(1));
+
         //Ticks
         startDSP = AudioSettings.dspTime;
         startDSP += Time.deltaTime;
@@ -125,7 +147,7 @@ public class GameManager : MonoBehaviour {
         while(startDSP > nextTickTime) {
             ticked.Invoke();
             nextTickTime += tickLength;
-            tickNum++;
+            tickCount++;
         }
         //End Ticks
 
@@ -139,7 +161,7 @@ public class GameManager : MonoBehaviour {
             }
             mainSrc.loop = false;
             startingUp = true;
-            tickNum = 0;
+            tickCount = 0;
 
             readyText.text = "READY";
 
@@ -163,8 +185,6 @@ public class GameManager : MonoBehaviour {
     }
 
     public void UpdateInGame() {
-        KingSemaphore();
-
         if (Input.GetMouseButtonDown(0))
             Conquer();
         if (Input.GetMouseButtonDown(1))
@@ -174,38 +194,6 @@ public class GameManager : MonoBehaviour {
         foreach (Transform t in allEntities) {
             t.Translate(0, -2 * Time.deltaTime, 0);
         }
-        // float yTarget = armyGoals[0].y + 2 * Time.deltaTime;
-        // for (int i = 0;i < armyGoals.Length;i++)
-        //     armyGoals[i] = new Vector2(armyGoals[i].x, yTarget);
-        
-        // float camPos = Mathf.Lerp(Camera.main.transform.position.y, yTarget, 10 * Time.deltaTime);
-        // Camera.main.transform.position = new Vector3(0, camPos, -10);
-    }
-
-    public void KingSemaphore() {
-        float second = Time.time - startTime;
-        int beat = (int)(beatTempo * second);
-        bool changedLMB = false, changedRMB = false;
-
-        //King Semaphore
-        if (beat + 2 < totalBeats) {
-            for (int i = 2;i >= 0;i--) {
-                if (lmbArr[beat + i]) {
-                    kingAnim.SetInteger("LMB", 3 - i);
-                    changedLMB = true;
-                }
-
-                if (rmbArr[beat + i]) {
-                    kingAnim.SetInteger("RMB", 3 - i);
-                    changedRMB = true;
-                }
-            }
-        }
-
-        if (!changedLMB)
-            kingAnim.SetInteger("LMB", 0);
-        if (!changedRMB)
-            kingAnim.SetInteger("RMB", 0);
     }
 
     public void StartMusic() {
